@@ -1,0 +1,94 @@
+- name: Pre-pull images (optional)
+  when: prepull_images
+  block:
+      - command: podman pull docker.io/library/redis:7
+        register: p1
+        changed_when: "'Downloaded' in p1.stdout or 'downloaded' in p1.stdout"
+      - command: podman pull ghcr.io/immich-app/postgres:16-vectorchord0.5.3-pgvector0.8.1
+        register: p2
+        changed_when: "'Downloaded' in p2.stdout or 'downloaded' in p2.stdout"
+      - command: podman pull ghcr.io/immich-app/immich-machine-learning:release
+        register: p3
+        changed_when: "'Downloaded' in p3.stdout or 'downloaded' in p3.stdout"
+      - command: podman pull ghcr.io/immich-app/immich-server:release
+        register: p4
+        changed_when: "'Downloaded' in p4.stdout or 'downloaded' in p4.stdout"
+
+- name: Create immich secret file if missing
+  shell: |
+      set -e
+      if [ ! -f "{{ secrets_dir }}/immich.env" ]; then
+        pw="$(openssl rand -base64 36 | tr -d '=+/' | cut -c1-32)"
+        echo "IMMICH_DB_PASSWORD=$pw" > "{{ secrets_dir }}/immich.env"
+        chmod 600 "{{ secrets_dir }}/immich.env"
+      fi
+  args:
+      executable: /bin/bash
+
+- name: Load immich secrets
+  shell: ". {{ secrets_dir }}/immich.env && echo $IMMICH_DB_PASSWORD"
+  args:
+      executable: /bin/bash
+  register: im_pw
+  changed_when: false
+
+- name: Ensure immich DB volume exists
+  command: podman volume create immich-db
+  register: vol
+  failed_when: vol.rc != 0 and ("already exists" not in vol.stderr)
+
+- name: Create immich pod
+  command: >
+      podman pod create --name immich-pod
+      -p {{ ports.immich }}:2283/tcp
+  register: out
+  failed_when: out.rc != 0 and ("already exists" not in out.stderr)
+
+- name: Create immich-redis container
+  command: >
+      podman run -d --name immich-redis --pod immich-pod --restart=always
+      docker.io/library/redis:7
+  register: out2
+  failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
+
+- name: Create immich-db container
+  command: >
+      podman run -d --name immich-db --pod immich-pod --restart=always
+      -e POSTGRES_USER=immich
+      -e POSTGRES_PASSWORD={{ im_pw.stdout }}
+      -e POSTGRES_DB=immich
+      -v immich-db:/var/lib/postgresql/data
+      ghcr.io/immich-app/postgres:16-vectorchord0.5.3-pgvector0.8.1
+  register: out3
+  failed_when: out3.rc != 0 and ("name is already in use" not in out3.stderr)
+
+- name: Create immich-ml container
+  command: >
+      podman run -d --name immich-ml --pod immich-pod --restart=always
+      ghcr.io/immich-app/immich-machine-learning:release
+  register: out4
+  failed_when: out4.rc != 0 and ("name is already in use" not in out4.stderr)
+
+- name: Create immich-server container
+  command: >
+      podman run -d --name immich-server --pod immich-pod --restart=always
+      -e TZ={{ timezone }}
+      -e IMMICH_HOST=0.0.0.0
+      -e IMMICH_PORT=2283
+      -e DB_HOSTNAME=127.0.0.1
+      -e DB_USERNAME=immich
+      -e DB_PASSWORD={{ im_pw.stdout }}
+      -e DB_DATABASE_NAME=immich
+      -e DB_VECTOR_EXTENSION=vectorchord
+      -e REDIS_HOSTNAME=127.0.0.1
+      -e IMMICH_MACHINE_LEARNING_URL=http://127.0.0.1:3003
+      -v {{ srv_base }}/immich/upload:/usr/src/app/upload
+      ghcr.io/immich-app/immich-server:release
+  register: out5
+  failed_when: out5.rc != 0 and ("name is already in use" not in out5.stderr)
+
+- name: Enable and start immich pod unit
+  systemd:
+      name: pod-immich-pod.service
+      enabled: true
+      state: started

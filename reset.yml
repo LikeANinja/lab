@@ -1,0 +1,104 @@
+- name: Reset / remove homelab pods + containers
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+      wipe_volumes: false # set true to delete postgres volumes too
+      wipe_secrets: false # set true to delete secrets_dir
+      secrets_dir: "/root/homelab-secrets"
+
+      pods:
+          - jellyfin-pod
+          - navidrome-pod
+          - audiobookshelf-pod
+          - nextcloud-pod
+          - immich-pod
+          - pihole-pod
+
+      containers:
+          - jellyfin
+          - navidrome
+          - audiobookshelf
+          - nextcloud
+          - nextcloud-db
+          - immich-server
+          - immich-ml
+          - immich-redis
+          - immich-db
+          - pihole
+
+      volumes:
+          - nextcloud-db
+          - immich-db
+
+  tasks:
+      - name: Stop and disable pod units if present
+        block:
+            - name: Stop units
+              systemd:
+                  name: "pod-{{ item }}.service"
+                  state: stopped
+              loop: "{{ pods }}"
+              ignore_errors: true
+
+            - name: Disable units
+              systemd:
+                  name: "pod-{{ item }}.service"
+                  enabled: false
+              loop: "{{ pods }}"
+              ignore_errors: true
+
+        always:
+            - name: Reload systemd
+              systemd:
+                  daemon_reload: true
+
+      - name: Remove pods (force)
+        command: "podman pod rm -f {{ item }}"
+        loop: "{{ pods }}"
+        register: pod_rm
+        failed_when: false
+        changed_when: pod_rm.rc == 0
+
+      - name: Remove any remaining containers (safety)
+        command: "podman rm -f {{ item }}"
+        loop: "{{ containers }}"
+        register: ctr_rm
+        failed_when: false
+        changed_when: ctr_rm.rc == 0
+
+      - name: Remove generated unit files
+        file:
+            path: "/etc/systemd/system/pod-{{ item }}.service"
+            state: absent
+        loop: "{{ pods }}"
+        ignore_errors: true
+
+      - name: Reload systemd after unit removal
+        systemd:
+            daemon_reload: true
+
+      - name: Wipe named volumes (DB data) if requested
+        when: wipe_volumes | bool
+        block:
+            - name: Remove volumes
+              command: "podman volume rm {{ item }}"
+              loop: "{{ volumes }}"
+              register: vol_rm
+              failed_when: false
+              changed_when: vol_rm.rc == 0
+
+      - name: Wipe secrets if requested
+        when: wipe_secrets | bool
+        file:
+            path: "{{ secrets_dir }}"
+            state: absent
+
+      - name: Show remaining containers
+        command: "podman ps -a"
+        register: ps_out
+        changed_when: false
+
+      - debug:
+            msg: "{{ ps_out.stdout_lines }}"

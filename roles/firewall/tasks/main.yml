@@ -1,0 +1,53 @@
+- name: Enable UFW
+  ufw:
+      state: enabled
+      policy: deny
+
+- name: Allow service ports from LAN subnet
+  ufw:
+      rule: allow
+      from_ip: "{{ lan_subnet }}"
+      to_port: "{{ item }}"
+      proto: tcp
+  loop:
+      - "{{ ports.jellyfin }}"
+      - "{{ ports.navidrome }}"
+      - "{{ ports.audiobookshelf }}"
+      - "{{ ports.nextcloud }}"
+      - "{{ ports.immich }}"
+      - "{{ ports.pihole_web }}"
+
+- name: Allow Pi-hole DNS from LAN subnet
+  ufw:
+      rule: allow
+      from_ip: "{{ lan_subnet }}"
+      to_port: "53"
+      proto: "{{ item }}"
+  loop:
+      - tcp
+      - udp
+
+- name: Allow ports on tailscale0 (if enabled)
+  when: allow_tailscale
+  block:
+      - name: Allow TCP ports on tailscale0
+        ufw:
+            rule: allow
+            interface_in: tailscale0
+            to_port: "{{ item }}"
+            proto: tcp
+        loop:
+            - "{{ ports.jellyfin }}"
+            - "{{ ports.navidrome }}"
+            - "{{ ports.audiobookshelf }}"
+            - "{{ ports.nextcloud }}"
+            - "{{ ports.immich }}"
+            - "{{ ports.pihole_web }}"
+            - 53
+
+      - name: Allow UDP 53 on tailscale0
+        ufw:
+            rule: allow
+            interface_in: tailscale0
+            to_port: "53"
+            proto: udp

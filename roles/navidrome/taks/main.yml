@@ -1,0 +1,30 @@
+- name: Pre-pull navidrome image (optional)
+  when: prepull_images
+  command: podman pull docker.io/deluan/navidrome:latest
+  register: pull
+  changed_when: "'Downloaded' in pull.stdout or 'downloaded' in pull.stdout"
+
+- name: Create navidrome pod
+  command: >
+      podman pod create --name navidrome-pod
+      -p {{ ports.navidrome }}:4533/tcp
+  register: out
+  failed_when: out.rc != 0 and ("already exists" not in out.stderr)
+
+- name: Create navidrome container
+  command: >
+      podman run -d --name navidrome --pod navidrome-pod --restart=always
+      -e TZ={{ timezone }}
+      -e ND_MUSICFOLDER=/music
+      -e ND_DATAFOLDER=/data
+      -v {{ srv_base }}/navidrome/data:/data
+      -v {{ media_dir }}/music:/music:ro
+      docker.io/deluan/navidrome:latest
+  register: out2
+  failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
+
+- name: Enable and start navidrome pod unit
+  systemd:
+      name: pod-navidrome-pod.service
+      enabled: true
+      state: started

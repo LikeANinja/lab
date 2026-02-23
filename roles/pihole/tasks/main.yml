@@ -1,0 +1,52 @@
+- name: Pre-pull pihole image (optional)
+  when: prepull_images
+  command: podman pull docker.io/pihole/pihole:latest
+  register: pull
+  changed_when: "'Downloaded' in pull.stdout or 'downloaded' in pull.stdout"
+
+- name: Create pihole secret file if missing
+  shell: |
+    set -e
+    if [ ! -f "{{ secrets_dir }}/pihole.env" ]; then
+      pw="$(openssl rand -base64 36 | tr -d '=+/' | cut -c1-32)"
+      cat > "{{ secrets_dir }}/pihole.env" <<EOF
+PIHOLE_WEBPASSWORD=$pw
+EOF
+      chmod 600 "{{ secrets_dir }}/pihole.env"
+    fi
+  args:
+    executable: /bin/bash
+
+- name: Load pihole secrets
+  shell: ". {{ secrets_dir }}/pihole.env && echo $PIHOLE_WEBPASSWORD"
+  args:
+    executable: /bin/bash
+  register: ph_pw
+  changed_when: false
+
+- name: Create pihole pod
+  command: >
+    podman pod create --name pihole-pod
+    -p 53:53/tcp -p 53:53/udp
+    -p {{ ports.pihole_web }}:80/tcp
+  register: out
+  failed_when: out.rc != 0 and ("already exists" not in out.stderr)
+
+- name: Create pihole container
+  command: >
+    podman run -d --name pihole --pod pihole-pod --restart=always
+    -e TZ={{ timezone }}
+    -e WEBPASSWORD={{ ph_pw.stdout }}
+    -e DNS1={{ pihole_dns1 }}
+    -e DNS2={{ pihole_dns2 }}
+    -v {{ srv_base }}/pihole/etc-pihole:/etc/pihole
+    -v {{ srv_base }}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    docker.io/pihole/pihole:latest
+  register: out2
+  failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
+
+- name: Enable and start pihole pod unit
+  systemd:
+    name: pod-pihole-pod.service
+    enabled: true
+    state: started

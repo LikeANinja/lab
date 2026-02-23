@@ -1,0 +1,16 @@
+- name: Homelab rootful podman stack (pods + systemd)
+  hosts: homelab
+  become: true
+  gather_facts: true
+
+  roles:
+      - base
+      - firewall
+      - tailscale
+      - podman_rootful
+      - jellyfin
+      - navidrome
+      - audiobookshelf
+      - nextcloud
+      - immich
+      - pihole

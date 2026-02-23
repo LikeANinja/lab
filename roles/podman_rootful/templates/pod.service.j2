@@ -1,0 +1,12 @@
+[Unit]
+Description=Podman Pod {{ pod_name }}
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/podman pod start -a {{ pod_name }}
+ExecStop=/usr/bin/podman pod stop -t 10 {{ pod_name }}
+
+[Install]
+WantedBy=multi-user.target

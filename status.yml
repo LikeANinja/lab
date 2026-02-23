@@ -1,0 +1,134 @@
+- name: Homelab Status Overview
+  hosts: homelab
+  become: true
+  gather_facts: true
+
+  tasks:
+      - name: Header
+        debug:
+            msg:
+                - "========================================"
+                - "HOMELAB STATUS REPORT"
+                - "Host: {{ inventory_hostname }}"
+                - "Time: {{ ansible_date_time.iso8601 }}"
+                - "========================================"
+
+      # -------------------------------------------------
+      # PODS
+      # -------------------------------------------------
+
+      - name: Get pod status
+        command: podman pod ps
+        register: pod_ps
+        changed_when: false
+        failed_when: false
+
+      - name: Show pod status
+        debug:
+            msg: "{{ pod_ps.stdout_lines | default(['No pods found']) }}"
+
+      # -------------------------------------------------
+      # CONTAINERS
+      # -------------------------------------------------
+
+      - name: Get container status
+        command: podman ps -a
+        register: container_ps
+        changed_when: false
+        failed_when: false
+
+      - name: Show container status
+        debug:
+            msg: "{{ container_ps.stdout_lines | default(['No containers found']) }}"
+
+      # -------------------------------------------------
+      # LISTENING PORTS
+      # -------------------------------------------------
+
+      - name: Get listening TCP ports
+        command: ss -tulpn
+        register: ports
+        changed_when: false
+        failed_when: false
+
+      - name: Show listening ports
+        debug:
+            msg: "{{ ports.stdout_lines }}"
+
+      # -------------------------------------------------
+      # FIREWALL
+      # -------------------------------------------------
+
+      - name: Get UFW status
+        command: ufw status verbose
+        register: ufw_status
+        changed_when: false
+        failed_when: false
+
+      - name: Show UFW status
+        debug:
+            msg: "{{ ufw_status.stdout_lines }}"
+
+      # -------------------------------------------------
+      # TAILSCALE
+      # -------------------------------------------------
+
+      - name: Check tailscale status
+        command: tailscale status
+        register: tailscale_status
+        changed_when: false
+        failed_when: false
+
+      - name: Show tailscale status
+        debug:
+            msg: "{{ tailscale_status.stdout_lines | default(['Tailscale not installed']) }}"
+
+      - name: Show tailscale IP
+        command: tailscale ip -4
+        register: tailscale_ip
+        changed_when: false
+        failed_when: false
+
+      - name: Display tailscale IP
+        debug:
+            msg: >
+                {{
+                  tailscale_ip.stdout
+                    if tailscale_ip.rc == 0
+                    else "No tailscale IP (not connected)"
+                }}
+
+      # -------------------------------------------------
+      # DISK
+      # -------------------------------------------------
+
+      - name: Show disk usage
+        command: df -h
+        register: disk
+        changed_when: false
+        failed_when: false
+
+      - name: Display disk usage
+        debug:
+            msg: "{{ disk.stdout_lines }}"
+
+      # -------------------------------------------------
+      # FAILED SERVICES
+      # -------------------------------------------------
+
+      - name: Check failed systemd units
+        command: systemctl --failed
+        register: failed_units
+        changed_when: false
+        failed_when: false
+
+      - name: Show failed units
+        debug:
+            msg: "{{ failed_units.stdout_lines }}"
+
+      - name: Footer
+        debug:
+            msg:
+                - "========================================"
+                - "STATUS REPORT COMPLETE"
+                - "========================================"

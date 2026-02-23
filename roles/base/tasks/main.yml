@@ -1,0 +1,38 @@
+- name: Install base packages
+  apt:
+      update_cache: true
+      name:
+          - podman
+          - uidmap
+          - slirp4netns
+          - fuse-overlayfs
+          - ufw
+          - curl
+          - ca-certificates
+          - openssl
+          - jq
+      state: present
+
+- name: Create /srv layout
+  file:
+      path: "{{ item }}"
+      state: directory
+      mode: "0755"
+  loop:
+      - "{{ srv_base }}"
+      - "{{ media_dir }}"
+      - "{{ media_dir }}/movies"
+      - "{{ media_dir }}/tv"
+      - "{{ media_dir }}/music"
+      - "{{ media_dir }}/audiobooks"
+      - "{{ media_dir }}/podcasts"
+      - "{{ srv_base }}/jellyfin/config"
+      - "{{ srv_base }}/jellyfin/cache"
+      - "{{ srv_base }}/navidrome/data"
+      - "{{ srv_base }}/audiobookshelf/config"
+      - "{{ srv_base }}/audiobookshelf/metadata"
+      - "{{ srv_base }}/nextcloud/data"
+      - "{{ srv_base }}/immich/upload"
+      - "{{ srv_base }}/pihole/etc-pihole"
+      - "{{ srv_base }}/pihole/etc-dnsmasq.d"
+      - "{{ secrets_dir }}"
