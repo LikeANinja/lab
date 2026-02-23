@@ -28,29 +28,35 @@
     state: directory
     mode: "0755"
 
-- name: Seed storage.conf from default if missing
-  copy:
-    remote_src: true
-    src: /usr/share/containers/storage.conf
-    dest: /etc/containers/storage.conf
-    mode: "0644"
-  when: not (lookup('ansible.builtin.fileglob', '/etc/containers/storage.conf') | length > 0)
-
 - name: Ensure podman storage directory exists on /srv
   file:
     path: /srv/containers/storage
     state: directory
     mode: "0700"
 
-- name: Configure rootful podman graphroot to use /srv
-  lineinfile:
-    path: /etc/containers/storage.conf
-    regexp: '^\s*graphroot\s*='
-    line: 'graphroot = "/srv/containers/storage"'
-    create: true
+- name: Configure rootful podman storage to use /srv (create storage.conf)
+  copy:
+    dest: /etc/containers/storage.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [storage]
+      driver = "overlay"
+      graphroot = "/srv/containers/storage"
+      runroot = "/run/containers/storage"
 
-- name: Restart podman (best effort)
+      [storage.options]
+      mount_program = "/usr/bin/fuse-overlayfs"
+
+- name: Restart podman socket if present (best effort)
   systemd:
-    name: podman
+    name: podman.socket
+    state: restarted
+  ignore_errors: true
+
+- name: Restart podman service if present (best effort)
+  systemd:
+    name: podman.service
     state: restarted
   ignore_errors: true
