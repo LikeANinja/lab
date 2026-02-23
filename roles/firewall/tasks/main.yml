@@ -71,6 +71,20 @@
         to_port: "53"
         proto: udp
 
+- name: Allow SSH from LAN
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    from_ip: "{{ lan_subnet }}"
+
+- name: Allow SSH over Tailscale
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    interface: tailscale0
+
 - name: Reload UFW to apply forwarding changes
   command: ufw reload
   changed_when: false
