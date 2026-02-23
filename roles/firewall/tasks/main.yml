@@ -103,24 +103,24 @@
         - "{{ ports.pihole_web }}"
         - 53
 
-    - name: Allow UDP 53 on tailscale0
-      ufw:
-        rule: allow
-        interface_in: tailscale0
-        to_port: "53"
-        proto: udp
+- name: Allow UDP 53 on tailscale0
+  ufw:
+    rule: allow
+    interface_in: tailscale0
+    to_port: "53"
+    proto: udp
 
 - name: Allow SSH from LAN
   ufw:
     rule: allow
-    port: "22"
+    to_port: "22"
     proto: tcp
     from_ip: "{{ lan_subnet }}"
 
 - name: Allow SSH over Tailscale
   ufw:
     rule: allow
-    port: "22"
+    to_port: "22"
     proto: tcp
     interface: tailscale0
 
