@@ -124,6 +124,26 @@
     proto: tcp
     interface_in: tailscale0
 
+- name: Allow Samba from LAN
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    from_ip: "{{ lan_subnet }}"
+  loop:
+    - 445
+    - 139
+
+- name: Allow Samba UDP from LAN
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+    from_ip: "{{ lan_subnet }}"
+  loop:
+    - 137
+    - 138
+
 - name: Reload UFW to apply forwarding changes
   command: ufw reload
   changed_when: false
