@@ -1,38 +1,56 @@
-- name: Install base packages
-  apt:
-      update_cache: true
-      name:
-          - podman
-          - uidmap
-          - slirp4netns
-          - fuse-overlayfs
-          - ufw
-          - curl
-          - ca-certificates
-          - openssl
-          - jq
-      state: present
-
 - name: Create /srv layout
   file:
-      path: "{{ item }}"
-      state: directory
-      mode: "0755"
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
   loop:
-      - "{{ srv_base }}"
-      - "{{ media_dir }}"
-      - "{{ media_dir }}/movies"
-      - "{{ media_dir }}/tv"
-      - "{{ media_dir }}/music"
-      - "{{ media_dir }}/audiobooks"
-      - "{{ media_dir }}/podcasts"
-      - "{{ srv_base }}/jellyfin/config"
-      - "{{ srv_base }}/jellyfin/cache"
-      - "{{ srv_base }}/navidrome/data"
-      - "{{ srv_base }}/audiobookshelf/config"
-      - "{{ srv_base }}/audiobookshelf/metadata"
-      - "{{ srv_base }}/nextcloud/data"
-      - "{{ srv_base }}/immich/upload"
-      - "{{ srv_base }}/pihole/etc-pihole"
-      - "{{ srv_base }}/pihole/etc-dnsmasq.d"
-      - "{{ secrets_dir }}"
+    - "{{ srv_base }}"
+    - "{{ media_dir }}"
+    - "{{ media_dir }}/movies"
+    - "{{ media_dir }}/tv"
+    - "{{ media_dir }}/music"
+    - "{{ media_dir }}/audiobooks"
+    - "{{ media_dir }}/podcasts"
+    - "{{ srv_base }}/jellyfin/config"
+    - "{{ srv_base }}/jellyfin/cache"
+    - "{{ srv_base }}/navidrome/data"
+    - "{{ srv_base }}/audiobookshelf/config"
+    - "{{ srv_base }}/audiobookshelf/metadata"
+    - "{{ srv_base }}/nextcloud/data"
+    - "{{ srv_base }}/immich/upload"
+    - "{{ srv_base }}/pihole/etc-pihole"
+    - "{{ srv_base }}/pihole/etc-dnsmasq.d"
+    - "{{ secrets_dir }}"
+
+- name: Ensure /etc/containers exists
+  file:
+    path: /etc/containers
+    state: directory
+    mode: "0755"
+
+- name: Seed storage.conf from default if missing
+  copy:
+    remote_src: true
+    src: /usr/share/containers/storage.conf
+    dest: /etc/containers/storage.conf
+    mode: "0644"
+  when: not (lookup('ansible.builtin.fileglob', '/etc/containers/storage.conf') | length > 0)
+
+- name: Ensure podman storage directory exists on /srv
+  file:
+    path: /srv/containers/storage
+    state: directory
+    mode: "0700"
+
+- name: Configure rootful podman graphroot to use /srv
+  lineinfile:
+    path: /etc/containers/storage.conf
+    regexp: '^\s*graphroot\s*='
+    line: 'graphroot = "/srv/containers/storage"'
+    create: true
+
+- name: Restart podman (best effort)
+  systemd:
+    name: podman
+    state: restarted
+  ignore_errors: true

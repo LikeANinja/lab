@@ -1,53 +1,84 @@
+- name: Allow routed/forwarded traffic (needed for podman port forwarding)
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: "^DEFAULT_FORWARD_POLICY="
+    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+
+- name: Enable IPv4 forwarding in UFW sysctl
+  lineinfile:
+    path: /etc/ufw/sysctl.conf
+    regexp: '^\s*#?\s*net\/ipv4\/ip_forward\s*='
+    line: "net/ipv4/ip_forward=1"
+
+- name: Ensure runtime IPv4 forwarding is enabled
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: true
+
 - name: Enable UFW
   ufw:
-      state: enabled
-      policy: deny
+    state: enabled
+    policy: deny
 
 - name: Allow service ports from LAN subnet
   ufw:
-      rule: allow
-      from_ip: "{{ lan_subnet }}"
-      to_port: "{{ item }}"
-      proto: tcp
+    rule: allow
+    from_ip: "{{ lan_subnet }}"
+    to_port: "{{ item }}"
+    proto: tcp
   loop:
-      - "{{ ports.jellyfin }}"
-      - "{{ ports.navidrome }}"
-      - "{{ ports.audiobookshelf }}"
-      - "{{ ports.nextcloud }}"
-      - "{{ ports.immich }}"
-      - "{{ ports.pihole_web }}"
+    - "{{ ports.jellyfin }}"
+    - "{{ ports.navidrome }}"
+    - "{{ ports.audiobookshelf }}"
+    - "{{ ports.nextcloud }}"
+    - "{{ ports.immich }}"
+    - "{{ ports.pihole_web }}"
 
 - name: Allow Pi-hole DNS from LAN subnet
   ufw:
-      rule: allow
-      from_ip: "{{ lan_subnet }}"
-      to_port: "53"
-      proto: "{{ item }}"
+    rule: allow
+    from_ip: "{{ lan_subnet }}"
+    to_port: "53"
+    proto: "{{ item }}"
   loop:
-      - tcp
-      - udp
+    - tcp
+    - udp
 
 - name: Allow ports on tailscale0 (if enabled)
   when: allow_tailscale
   block:
-      - name: Allow TCP ports on tailscale0
-        ufw:
-            rule: allow
-            interface_in: tailscale0
-            to_port: "{{ item }}"
-            proto: tcp
-        loop:
-            - "{{ ports.jellyfin }}"
-            - "{{ ports.navidrome }}"
-            - "{{ ports.audiobookshelf }}"
-            - "{{ ports.nextcloud }}"
-            - "{{ ports.immich }}"
-            - "{{ ports.pihole_web }}"
-            - 53
+    - name: Allow TCP ports on tailscale0
+      ufw:
+        rule: allow
+        interface_in: tailscale0
+        to_port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "{{ ports.jellyfin }}"
+        - "{{ ports.navidrome }}"
+        - "{{ ports.audiobookshelf }}"
+        - "{{ ports.nextcloud }}"
+        - "{{ ports.immich }}"
+        - "{{ ports.pihole_web }}"
+        - 53
 
-      - name: Allow UDP 53 on tailscale0
-        ufw:
-            rule: allow
-            interface_in: tailscale0
-            to_port: "53"
-            proto: udp
+    - name: Allow UDP 53 on tailscale0
+      ufw:
+        rule: allow
+        interface_in: tailscale0
+        to_port: "53"
+        proto: udp
+
+- name: Reload UFW to apply forwarding changes
+  command: ufw reload
+  changed_when: false
+
+- name: Show UFW status (debug)
+  command: ufw status verbose
+  register: ufw_verbose
+  changed_when: false
+
+- debug:
+    msg: "{{ ufw_verbose.stdout_lines }}"

@@ -1,21 +1,23 @@
 - name: Ensure systemd unit directory exists
   file:
-      path: /etc/systemd/system
-      state: directory
+    path: /etc/systemd/system
+    state: directory
 
 - name: Write pod systemd units
   template:
-      src: pod.service.j2
-      dest: "/etc/systemd/system/pod-{{ item }}.service"
-      mode: "0644"
+    src: pod.service.j2
+    dest: "/etc/systemd/system/pod-{{ item }}.service"
+    mode: "0644"
   loop:
-      - jellyfin-pod
-      - navidrome-pod
-      - audiobookshelf-pod
-      - nextcloud-pod
-      - immich-pod
-      - pihole-pod
+    - jellyfin-pod
+    - navidrome-pod
+    - audiobookshelf-pod
+    - nextcloud-pod
+    - immich-pod
+    - pihole-pod
+  vars:
+    pod_name: "{{ item }}"
 
 - name: Reload systemd
   systemd:
-      daemon_reload: true
+    daemon_reload: true
