@@ -1,0 +1,61 @@
+---
+- name: Install Samba
+  apt:
+    update_cache: true
+    name:
+      - samba
+      - samba-common-bin
+    state: present
+
+- name: Ensure smbusers group exists
+  group:
+    name: smbusers
+    state: present
+
+- name: Ensure media directory exists
+  file:
+    path: /srv/media
+    state: directory
+    owner: ninja
+    group: smbusers
+    mode: "0775"
+
+- name: Deploy smb.conf
+  template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Samba
+
+- name: Ensure samba users exist as Linux users
+  user:
+    name: "{{ item.name }}"
+    shell: /usr/sbin/nologin
+    groups: smbusers
+    append: yes
+    create_home: no
+  loop: "{{ samba_users }}"
+
+- name: Set samba passwords (idempotent-ish)
+  shell: |
+    set -e
+    (pdbedit -L | awk '{print $1}' | grep -qx '{{ item.name }}') \
+      && echo "Samba user {{ item.name }} already exists" \
+      || (echo -e '{{ item.password }}\n{{ item.password }}' | smbpasswd -a -s '{{ item.name }}')
+  args:
+    executable: /bin/bash
+  loop: "{{ samba_users }}"
+
+- name: Enable and start smbd
+  systemd:
+    name: smbd
+    enabled: true
+    state: started
+
+- name: Enable and start nmbd
+  systemd:
+    name: nmbd
+    enabled: true
+    state: started

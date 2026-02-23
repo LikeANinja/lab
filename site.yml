@@ -2,15 +2,19 @@
   hosts: homelab
   become: true
   gather_facts: true
-
+  vars_files:
+    - group_vars/vault.yml
+  environment:
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   roles:
-      - base
-      - firewall
-      - tailscale
-      - podman_rootful
-      - jellyfin
-      - navidrome
-      - audiobookshelf
-      - nextcloud
-      - immich
-      - pihole
+    - base
+    - firewall
+    - samba
+    - tailscale
+    - podman_rootful
+    - jellyfin
+    - navidrome
+    - audiobookshelf
+    - nextcloud
+    - immich
+    - pihole

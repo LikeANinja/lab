@@ -1,0 +1,12 @@
+---
+- name: Restart Samba
+  systemd:
+    name: smbd
+    state: restarted
+    enabled: true
+
+- name: Restart NetBIOS
+  systemd:
+    name: nmbd
+    state: restarted
+    enabled: true
