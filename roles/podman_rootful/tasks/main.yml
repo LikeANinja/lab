@@ -17,6 +17,7 @@
     - pihole-pod
   vars:
     pod_name: "{{ item }}"
+  when: item in existing_pods.stdout_lines
 
 - name: Reload systemd
   systemd:
@@ -36,3 +37,4 @@
     - pihole-pod
   vars:
     pod_name: "{{ item }}"
+  when: item in existing_pods.stdout_lines
