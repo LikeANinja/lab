@@ -7,12 +7,12 @@ lan_subnet: "192.168.1.0/24"
 allow_tailscale: true
 
 ports:
-    jellyfin: 8096
-    navidrome: 4533
-    audiobookshelf: 13378
-    nextcloud: 8080
-    immich: 2283
-    pihole_web: 8081
+  jellyfin: 8096
+  navidrome: 4533
+  audiobookshelf: 13378
+  nextcloud: 8080
+  immich: 2283
+  pihole_web: 8081
 
 pihole_dns1: "1.1.1.1"
 pihole_dns2: "1.0.0.1"
@@ -21,3 +21,11 @@ secrets_dir: "/root/homelab-secrets"
 
 # If true, playbooks will `podman pull` images before creating containers
 prepull_images: true
+
+pod_names:
+  - jellyfin-pod
+  - navidrome-pod
+  - audiobookshelf-pod
+  - nextcloud-pod
+  - immich-pod
+  - pihole-pod

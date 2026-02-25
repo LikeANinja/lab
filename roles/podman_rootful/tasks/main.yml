@@ -14,13 +14,7 @@
   args:
     chdir: /etc/systemd/system
     creates: "/etc/systemd/system/pod-{{ item }}.service"
-  loop:
-    - jellyfin-pod
-    - navidrome-pod
-    - audiobookshelf-pod
-    - nextcloud-pod
-    - immich-pod
-    - pihole-pod
+  loop: "{{ pod_names }}"
   vars:
     pod_name: "{{ item }}"
   when: item in (existing_pods.stdout_lines | default([]))
@@ -34,13 +28,7 @@
     name: "pod-{{ item }}.service"
     enabled: true
     state: started
-  loop:
-    - jellyfin-pod
-    - navidrome-pod
-    - audiobookshelf-pod
-    - nextcloud-pod
-    - immich-pod
-    - pihole-pod
+  loop: "{{ pod_names }}"
   vars:
     pod_name: "{{ item }}"
   when: item in (existing_pods.stdout_lines | default([]))
