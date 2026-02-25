@@ -3,6 +3,12 @@
     path: /etc/systemd/system
     state: directory
 
+- name: List existing pods (rootful)
+  command: podman pod ls --format "{{'{{'}}.Name{{'}}'}}"
+  register: existing_pods
+  changed_when: false
+  failed_when: false
+
 - name: Generate systemd units for pods (legacy but reliable)
   command: podman generate systemd --new --name {{ item }} --files
   args:
@@ -17,7 +23,7 @@
     - pihole-pod
   vars:
     pod_name: "{{ item }}"
-  when: item in existing_pods.stdout_lines
+  when: item in (existing_pods.stdout_lines | default([]))
 
 - name: Reload systemd
   systemd:
@@ -37,4 +43,4 @@
     - pihole-pod
   vars:
     pod_name: "{{ item }}"
-  when: item in existing_pods.stdout_lines
+  when: item in (existing_pods.stdout_lines | default([]))
