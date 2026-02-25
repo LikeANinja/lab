@@ -1,27 +1,52 @@
-- name: Install tailscale from Debian repos (preferred)
+---
+- name: Install tailscale from Debian repos
   apt:
     update_cache: true
     name: tailscale
     state: present
-  register: ts_install
-  failed_when: false
 
-- name: Check if tailscaled unit exists
-  command: systemctl list-unit-files tailscaled.service
-  register: ts_unit
-  changed_when: false
-  failed_when: false
+- name: Enable and start tailscaled
+  systemd:
+    name: tailscaled
+    enabled: true
+    state: started
 
-- name: Show tailscale version (if installed)
+- name: Show tailscale version
   command: tailscale version
   register: ts_ver
   changed_when: false
   failed_when: false
 
-- name: Tailscale install status
+- name: Check tailscale status (json)
+  command: tailscale status --json
+  register: ts_status
+  changed_when: false
+  failed_when: false
+
+- name: Determine if tailscale is already up
+  set_fact:
+    ts_is_up: '{{ (ts_status.rc == 0) and (ts_status.stdout is search(''"Self"'')) }}'
+
+- name: Bring up tailscale with auth key + enable Tailscale SSH (first run only)
+  command: >
+    tailscale up
+    --authkey={{ tailscale_auth_key }}
+    --ssh
+    {% if tailscale_hostname is defined and tailscale_hostname|length > 0 %} --hostname={{ tailscale_hostname }} {% endif %}
+    {% if tailscale_tags is defined and tailscale_tags|length > 0 %} --advertise-tags={{ tailscale_tags | join(",") }} {% endif %}
+  when: not ts_is_up
+
+# Optional: enforce SSH enabled even if already up
+- name: Ensure Tailscale SSH is enabled
+  command: tailscale set --ssh
+  when: ts_is_up
+  changed_when: false
+  failed_when: false
+
+- name: Tailscale status
   debug:
     msg:
-      - "tailscale apt install rc={{ ts_install.rc | default('n/a') }}"
-      - "tailscaled unit present={{ (ts_unit.rc == 0) }}"
-      - "tailscale version={{ ts_ver.stdout | default('not installed') }}"
-      - "To join: sudo tailscale up"
+      - "tailscale version={{ ts_ver.stdout | default('unknown') }}"
+      - "tailscale up={{ ts_is_up }}"
+      - "tailscale status rc={{ ts_status.rc }}"
+      - "tailscale0 interface should exist once up"
