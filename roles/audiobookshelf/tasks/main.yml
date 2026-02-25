@@ -6,25 +6,19 @@
 
 - name: Create audiobookshelf pod
   command: >
-      podman pod create --name audiobookshelf-pod
-      -p {{ ports.audiobookshelf }}:80/tcp
+    podman pod create --name audiobookshelf-pod
+    -p {{ ports.audiobookshelf }}:80/tcp
   register: out
   failed_when: out.rc != 0 and ("already exists" not in out.stderr)
 
 - name: Create audiobookshelf container
   command: >
-      podman run -d --name audiobookshelf --pod audiobookshelf-pod --restart=always
-      -e TZ={{ timezone }}
-      -v {{ srv_base }}/audiobookshelf/config:/config
-      -v {{ srv_base }}/audiobookshelf/metadata:/metadata
-      -v {{ media_dir }}/audiobooks:/audiobooks:ro
-      -v {{ media_dir }}/podcasts:/podcasts
-      ghcr.io/advplyr/audiobookshelf:latest
+    podman run -d --name audiobookshelf --pod audiobookshelf-pod --restart=always
+    -e TZ={{ timezone }}
+    -v {{ srv_base }}/audiobookshelf/config:/config
+    -v {{ srv_base }}/audiobookshelf/metadata:/metadata
+    -v {{ media_dir }}/audiobooks:/audiobooks:ro
+    -v {{ media_dir }}/podcasts:/podcasts
+    ghcr.io/advplyr/audiobookshelf:latest
   register: out2
   failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
-
-- name: Enable and start audiobookshelf pod unit
-  systemd:
-      name: pod-audiobookshelf-pod.service
-      enabled: true
-      state: started
