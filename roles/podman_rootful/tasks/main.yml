@@ -21,3 +21,18 @@
 - name: Reload systemd
   systemd:
     daemon_reload: true
+
+- name: Enable and start pod units
+  systemd:
+    name: "pod-{{ item }}.service"
+    enabled: true
+    state: started
+  loop:
+    - jellyfin-pod
+    - navidrome-pod
+    - audiobookshelf-pod
+    - nextcloud-pod
+    - immich-pod
+    - pihole-pod
+  vars:
+    pod_name: "{{ item }}"
