@@ -12,13 +12,6 @@
   changed_when: false
   failed_when: false
 
-- name: Enable and start tailscaled if unit exists
-  when: ts_unit.rc == 0
-  systemd:
-    name: tailscaled.service
-    enabled: true
-    state: started
-
 - name: Show tailscale version (if installed)
   command: tailscale version
   register: ts_ver

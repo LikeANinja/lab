@@ -6,24 +6,18 @@
 
 - name: Create jellyfin pod
   command: >
-      podman pod create --name jellyfin-pod
-      -p {{ ports.jellyfin }}:8096/tcp
+    podman pod create --name jellyfin-pod
+    -p {{ ports.jellyfin }}:8096/tcp
   register: out
   failed_when: out.rc != 0 and ("already exists" not in out.stderr)
 
 - name: Create jellyfin container
   command: >
-      podman run -d --name jellyfin --pod jellyfin-pod --restart=always
-      -e TZ={{ timezone }}
-      -v {{ srv_base }}/jellyfin/config:/config
-      -v {{ srv_base }}/jellyfin/cache:/cache
-      -v {{ media_dir }}:/media:ro
-      docker.io/jellyfin/jellyfin:latest
+    podman run -d --name jellyfin --pod jellyfin-pod --restart=always
+    -e TZ={{ timezone }}
+    -v {{ srv_base }}/jellyfin/config:/config
+    -v {{ srv_base }}/jellyfin/cache:/cache
+    -v {{ media_dir }}:/media:ro
+    docker.io/jellyfin/jellyfin:latest
   register: out2
   failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
-
-- name: Enable and start jellyfin pod unit
-  systemd:
-      name: pod-jellyfin-pod.service
-      enabled: true
-      state: started

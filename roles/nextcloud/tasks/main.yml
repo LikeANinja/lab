@@ -1,28 +1,28 @@
 - name: Pre-pull images (optional)
   when: prepull_images
   block:
-      - command: podman pull docker.io/library/postgres:16
-        register: p1
-        changed_when: "'Downloaded' in p1.stdout or 'downloaded' in p1.stdout"
-      - command: podman pull docker.io/library/nextcloud:apache
-        register: p2
-        changed_when: "'Downloaded' in p2.stdout or 'downloaded' in p2.stdout"
+    - command: podman pull docker.io/library/postgres:16
+      register: p1
+      changed_when: "'Downloaded' in p1.stdout or 'downloaded' in p1.stdout"
+    - command: podman pull docker.io/library/nextcloud:apache
+      register: p2
+      changed_when: "'Downloaded' in p2.stdout or 'downloaded' in p2.stdout"
 
 - name: Create nextcloud secret file if missing
   shell: |
-      set -e
-      if [ ! -f "{{ secrets_dir }}/nextcloud.env" ]; then
-        pw="$(openssl rand -base64 36 | tr -d '=+/' | cut -c1-32)"
-        echo "NC_DB_PASSWORD=$pw" > "{{ secrets_dir }}/nextcloud.env"
-        chmod 600 "{{ secrets_dir }}/nextcloud.env"
-      fi
+    set -e
+    if [ ! -f "{{ secrets_dir }}/nextcloud.env" ]; then
+      pw="$(openssl rand -base64 36 | tr -d '=+/' | cut -c1-32)"
+      echo "NC_DB_PASSWORD=$pw" > "{{ secrets_dir }}/nextcloud.env"
+      chmod 600 "{{ secrets_dir }}/nextcloud.env"
+    fi
   args:
-      executable: /bin/bash
+    executable: /bin/bash
 
 - name: Load nextcloud secrets
   shell: ". {{ secrets_dir }}/nextcloud.env && echo $NC_DB_PASSWORD"
   args:
-      executable: /bin/bash
+    executable: /bin/bash
   register: nc_pw
   changed_when: false
 
@@ -33,37 +33,31 @@
 
 - name: Create nextcloud pod
   command: >
-      podman pod create --name nextcloud-pod
-      -p {{ ports.nextcloud }}:80/tcp
+    podman pod create --name nextcloud-pod
+    -p {{ ports.nextcloud }}:80/tcp
   register: out
   failed_when: out.rc != 0 and ("already exists" not in out.stderr)
 
 - name: Create nextcloud-db container
   command: >
-      podman run -d --name nextcloud-db --pod nextcloud-pod --restart=always
-      -e POSTGRES_DB=nextcloud
-      -e POSTGRES_USER=nextcloud
-      -e POSTGRES_PASSWORD={{ nc_pw.stdout }}
-      -v nextcloud-db:/var/lib/postgresql/data
-      docker.io/library/postgres:16
+    podman run -d --name nextcloud-db --pod nextcloud-pod --restart=always
+    -e POSTGRES_DB=nextcloud
+    -e POSTGRES_USER=nextcloud
+    -e POSTGRES_PASSWORD={{ nc_pw.stdout }}
+    -v nextcloud-db:/var/lib/postgresql/data
+    docker.io/library/postgres:16
   register: out2
   failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
 
 - name: Create nextcloud container
   command: >
-      podman run -d --name nextcloud --pod nextcloud-pod --restart=always
-      -e TZ={{ timezone }}
-      -e POSTGRES_HOST=127.0.0.1
-      -e POSTGRES_DB=nextcloud
-      -e POSTGRES_USER=nextcloud
-      -e POSTGRES_PASSWORD={{ nc_pw.stdout }}
-      -v {{ srv_base }}/nextcloud/data:/var/www/html/data
-      docker.io/library/nextcloud:apache
+    podman run -d --name nextcloud --pod nextcloud-pod --restart=always
+    -e TZ={{ timezone }}
+    -e POSTGRES_HOST=127.0.0.1
+    -e POSTGRES_DB=nextcloud
+    -e POSTGRES_USER=nextcloud
+    -e POSTGRES_PASSWORD={{ nc_pw.stdout }}
+    -v {{ srv_base }}/nextcloud/data:/var/www/html/data
+    docker.io/library/nextcloud:apache
   register: out3
   failed_when: out3.rc != 0 and ("name is already in use" not in out3.stderr)
-
-- name: Enable and start nextcloud pod unit
-  systemd:
-      name: pod-nextcloud-pod.service
-      enabled: true
-      state: started
