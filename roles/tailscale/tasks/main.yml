@@ -19,6 +19,7 @@
     name: tailscaled
     enabled: true
     state: started
+  become: true
 
 - name: Show tailscale version
   command: tailscale version
@@ -31,19 +32,32 @@
   register: ts_status
   changed_when: false
   failed_when: false
+  become: true
 
-- name: Determine if tailscale is already up
+- name: Decide if tailscale needs login
   set_fact:
-    ts_is_up: '{{ (ts_status.rc == 0) and (ts_status.stdout is search(''"Self"'')) }}'
+    ts_needs_login: >-
+      {{
+        (ts_status.rc != 0)
+        or (ts_status.stdout | default('') | length == 0)
+        or (
+          (ts_status.stdout | default('{}') | from_json).Self is not defined
+        )
+        or (
+          (ts_status.stdout | default('{}') | from_json).BackendState is defined
+          and (ts_status.stdout | from_json).BackendState != 'Running'
+        )
+      }}
 
 - name: Bring up tailscale with auth key + enable Tailscale SSH (first run only)
   command: >
     tailscale up
     --authkey={{ tailscale_auth_key }}
     --ssh
+    --reset
     {% if tailscale_hostname is defined and tailscale_hostname|length > 0 %} --hostname={{ tailscale_hostname }} {% endif %}
     {% if tailscale_tags is defined and tailscale_tags|length > 0 %} --advertise-tags={{ tailscale_tags | join(",") }} {% endif %}
-  when: not ts_is_up
+  when: ts_needs_login
   become: true
 
 # Optional: enforce SSH enabled even if already up
