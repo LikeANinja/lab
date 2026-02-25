@@ -25,7 +25,7 @@
       -o /usr/share/keyrings/tailscale-archive-keyring.gpg
   args:
     executable: /bin/bash
-  when: ts_install_debian is failed or ts_install_debian.rc != 0
+  when: ts_install_debian.failed | default(false)
 
 - name: Add Tailscale apt repo (Debian)
   copy:
@@ -35,7 +35,7 @@
     owner: root
     group: root
     mode: "0644"
-  when: ts_install_debian is failed or ts_install_debian.rc != 0
+  when: ts_install_debian.failed | default(false)
 
 - name: Install tailscale (after adding repo if needed)
   apt:
