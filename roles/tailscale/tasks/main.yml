@@ -1,69 +1,18 @@
 ---
-- name: Install prerequisites for apt repos
+- name: Install prerequisites
   apt:
     name:
       - ca-certificates
       - curl
-      - gnupg
     state: present
     update_cache: true
 
-- name: Try install tailscale from Debian repos
-  apt:
-    name: tailscale
-    state: present
-  register: ts_install_debian
-  failed_when: false
-
-- name: Add Tailscale apt repo key (Debian trixie)
+- name: Install tailscale via official install script (adds repo + installs)
   shell: |
     set -euo pipefail
-    install -m 0755 -d /usr/share/keyrings
-    curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
-      -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+    curl -fsSL https://tailscale.com/install.sh | sh
   args:
     executable: /bin/bash
-  when: ts_install_debian.failed | default(false)
-
-- name: Add Tailscale apt repo (Debian trixie)
-  copy:
-    dest: /etc/apt/sources.list.d/tailscale.list
-    content: |
-      deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian trixie main
-    owner: root
-    group: root
-    mode: "0644"
-  when: ts_install_debian.failed | default(false)
-
-- name: Apt update after adding Tailscale repo
-  apt:
-    update_cache: true
-  when: ts_install_debian.failed | default(false)
-
-- name: Check tailscale candidate version
-  command: apt-cache policy tailscale
-  register: ts_policy
-  changed_when: false
-  failed_when: false
-
-- name: Fail with helpful message if tailscale still not visible in apt
-  fail:
-    msg: |
-      tailscale package is still not available after adding the repo.
-
-      apt-cache policy tailscale output:
-      {{ ts_policy.stdout | default('no output') }}
-
-      Check:
-      - Can the server reach https://pkgs.tailscale.com ?
-      - Is /etc/apt/sources.list.d/tailscale.list present?
-      - Is the key at /usr/share/keyrings/tailscale-archive-keyring.gpg present?
-  when: ts_policy.stdout is not search('Candidate:')
-
-- name: Install tailscale
-  apt:
-    name: tailscale
-    state: present
 
 - name: Enable and start tailscaled
   systemd:
