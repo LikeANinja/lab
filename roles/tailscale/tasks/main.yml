@@ -8,7 +8,6 @@
     state: present
     update_cache: true
 
-# Try Debian repos first (won't fail the play)
 - name: Try install tailscale from Debian repos
   apt:
     name: tailscale
@@ -16,8 +15,7 @@
   register: ts_install_debian
   failed_when: false
 
-# If not available, add official Tailscale repo and install
-- name: Add Tailscale apt repo key (Debian)
+- name: Add Tailscale apt repo key (Debian trixie)
   shell: |
     set -euo pipefail
     install -m 0755 -d /usr/share/keyrings
@@ -27,7 +25,7 @@
     executable: /bin/bash
   when: ts_install_debian.failed | default(false)
 
-- name: Add Tailscale apt repo (Debian)
+- name: Add Tailscale apt repo (Debian trixie)
   copy:
     dest: /etc/apt/sources.list.d/tailscale.list
     content: |
@@ -37,11 +35,35 @@
     mode: "0644"
   when: ts_install_debian.failed | default(false)
 
-- name: Install tailscale (after adding repo if needed)
+- name: Apt update after adding Tailscale repo
+  apt:
+    update_cache: true
+  when: ts_install_debian.failed | default(false)
+
+- name: Check tailscale candidate version
+  command: apt-cache policy tailscale
+  register: ts_policy
+  changed_when: false
+  failed_when: false
+
+- name: Fail with helpful message if tailscale still not visible in apt
+  fail:
+    msg: |
+      tailscale package is still not available after adding the repo.
+
+      apt-cache policy tailscale output:
+      {{ ts_policy.stdout | default('no output') }}
+
+      Check:
+      - Can the server reach https://pkgs.tailscale.com ?
+      - Is /etc/apt/sources.list.d/tailscale.list present?
+      - Is the key at /usr/share/keyrings/tailscale-archive-keyring.gpg present?
+  when: ts_policy.stdout is not search('Candidate:')
+
+- name: Install tailscale
   apt:
     name: tailscale
     state: present
-    update_cache: true
 
 - name: Enable and start tailscaled
   systemd:
