@@ -44,6 +44,7 @@
     {% if tailscale_hostname is defined and tailscale_hostname|length > 0 %} --hostname={{ tailscale_hostname }} {% endif %}
     {% if tailscale_tags is defined and tailscale_tags|length > 0 %} --advertise-tags={{ tailscale_tags | join(",") }} {% endif %}
   when: not ts_is_up
+  become: true
 
 # Optional: enforce SSH enabled even if already up
 - name: Ensure Tailscale SSH is enabled
@@ -51,6 +52,7 @@
   when: ts_is_up
   changed_when: false
   failed_when: false
+  become: true
 
 - name: Tailscale status
   debug:
