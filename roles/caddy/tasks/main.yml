@@ -5,31 +5,37 @@
       - debian-keyring
       - debian-archive-keyring
       - apt-transport-https
+      - ca-certificates
       - curl
+      - gnupg
     state: present
     update_cache: true
   become: true
 
-- name: Add Caddy keyrings
-  shell: |
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' 
-    gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  args:
-    executable: /bin/bash
+- name: Ensure keyrings directory exists
+  file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: "0755"
   become: true
 
-- name: Add caddy list
+- name: Add Caddy GPG key (dearmored)
   shell: |
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' 
-    sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    set -euo pipefail
+    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
+      | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   args:
     executable: /bin/bash
+    creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   become: true
 
-- name: Set Cmod
+- name: Add Caddy apt repo list
   shell: |
-    chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+    set -euo pipefail
+    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
+      > /etc/apt/sources.list.d/caddy-stable.list
+  args:
+    executable: /bin/bash
   become: true
 
 - name: Apt update
