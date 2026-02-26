@@ -1,0 +1,14 @@
+{
+  email {{ caddy_acme_email }}
+}
+
+{% for s in caddy_sites %}
+{{ s.host }} {
+  tls {
+    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+  }
+
+  encode zstd gzip
+  reverse_proxy {{ s.upstream }}
+}
+{% endfor %}

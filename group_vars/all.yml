@@ -29,3 +29,11 @@ pod_names:
   - nextcloud-pod
   - immich-pod
   - pihole-pod
+
+tailscale_hostname: "ninja-dev"
+tailscale_tags: []
+
+caddy_http_port: 80
+caddy_https_port: 443
+
+caddy_sites: []

@@ -1,0 +1,71 @@
+---
+- name: Install prerequisits
+  apt:
+    name:
+      - debian-keyring
+      - debian-archive-keyring
+      - apt-transport-https
+      - curl
+    state: present
+    update_cache: true
+  become: true
+
+- name: Add Caddy keyrings
+  shell: |
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' 
+    gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  args:
+    executable: /bin/bash
+  become: true
+
+- name: Add caddy list
+  shell: |
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' 
+    sudo tee /etc/apt/sources.list.d/caddy-stable.list
+  args:
+    executable: /bin/bash
+  become: true
+
+- name: Set Cmod
+  shell: |
+    chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+  become: true
+
+- name: Apt update
+  apt:
+    name: caddy
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure /etc/caddy exists
+  file:
+    path: /etc/caddy
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: deploy caddyfile
+  template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+  become: true
+
+- name: Validate Caddyfile
+  command: caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+  become: true
+
+- name: Enable and start Caddy
+  systemd:
+    name: caddy
+    enabled: true
+    state: started
+  become: true

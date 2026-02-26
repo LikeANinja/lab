@@ -74,6 +74,8 @@
     - "{{ ports.nextcloud }}"
     - "{{ ports.immich }}"
     - "{{ ports.pihole_web }}"
+    - "{{ caddy_https_port }}"
+    - "{{ caddy_http_port }}"
 
 - name: Allow Pi-hole DNS from LAN subnet
   ufw:
@@ -101,6 +103,8 @@
         - "{{ ports.nextcloud }}"
         - "{{ ports.immich }}"
         - "{{ ports.pihole_web }}"
+        - "{{ caddy_https_port }}"
+        - "{{ caddy_http_port }}"
         - 53
 
 - name: Allow UDP 53 on tailscale0
