@@ -19,23 +19,24 @@
     mode: "0755"
   become: true
 
-- name: Add Caddy GPG key (dearmored)
+# Important: don't use "creates:" here; if a bad file exists you want to overwrite it.
+- name: Install/refresh Caddy signing key
   shell: |
     set -euo pipefail
     curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
       | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   args:
     executable: /bin/bash
-    creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   become: true
 
-- name: Add Caddy apt repo list
-  shell: |
-    set -euo pipefail
-    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
-      > /etc/apt/sources.list.d/caddy-stable.list
-  args:
-    executable: /bin/bash
+- name: Add Caddy apt repo (with signed-by)
+  copy:
+    dest: /etc/apt/sources.list.d/caddy-stable.list
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
   become: true
 
 - name: Apt update
