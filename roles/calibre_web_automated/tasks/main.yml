@@ -14,7 +14,7 @@
   become: true
 
 - name: Pull Calibre-Web-Automated image
-  command: "{{ podman_bin | default('/usr/bin/podman') }} pull crocodilestick/calibre-web-automated:latest"
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/crocodilestick/calibre-web-automated:latest"
   changed_when: false
   become: true
 
@@ -36,7 +36,7 @@
     -v /srv/calibre-web-automated/config:/config
     -v /srv/calibre-web-automated/library:/calibre-library
     -v /srv/calibre-web-automated/ingest:/cwa-book-ingest
-    crocodilestick/calibre-web-automated:latest
+    docker.io/crocodilestick/calibre-web-automated:latest
   register: cwa_run
   failed_when: cwa_run.rc != 0 and ("name is already in use" not in cwa_run.stderr)
   changed_when: cwa_run.rc == 0
