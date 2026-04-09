@@ -12,7 +12,7 @@
   become: true
 
 - name: Generate systemd units for existing pods
-  command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --new --name {{ item }} --files"
+  command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --name {{ item }} --files"
   args:
     chdir: /etc/systemd/system
     creates: "/etc/systemd/system/pod-{{ item }}.service"
@@ -28,7 +28,7 @@
   become: true
 
 - name: Generate systemd units for standalone containers
-  command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --new --name {{ item }} --files"
+  command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --name {{ item }} --files"
   args:
     chdir: /etc/systemd/system
     creates: "/etc/systemd/system/container-{{ item }}.service"
