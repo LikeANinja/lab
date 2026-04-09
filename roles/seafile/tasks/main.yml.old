@@ -1,0 +1,105 @@
+- name: Pre-pull seafile images (optional)
+  when: prepull_images | default(false)
+  block:
+    - name: Pull mariadb
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/library/mariadb:10.11"
+      changed_when: false
+      become: true
+
+    - name: Pull memcached
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/library/memcached:1.6-alpine"
+      changed_when: false
+      become: true
+
+    - name: Pull seafile
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/seafileltd/seafile-mc:13.0.20"
+      changed_when: false
+      become: true
+
+- name: Check if seafile pod exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pod exists seafile-pod"
+  register: seafile_pod_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile pod
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} pod create
+    --name seafile-pod
+    -p {{ ports.seafile }}:80
+  when: seafile_pod_exists.rc != 0
+  become: true
+
+- name: Check if seafile-db exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile-db"
+  register: seafile_db_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile-db
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name seafile-db
+    --pod seafile-pod
+    --restart=always
+    -e MYSQL_ROOT_PASSWORD={{ seafile_db_root_password }}
+    -e MYSQL_LOG_CONSOLE=true
+    -v /srv/seafile/db:/var/lib/mysql
+    docker.io/library/mariadb:10.11
+  when: seafile_db_exists.rc != 0
+  become: true
+
+- name: Wait for Seafile MariaDB to be ready
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} exec seafile-db
+    mariadb-admin ping -h 127.0.0.1 -uroot -p{{ seafile_db_root_password }}
+  register: seafile_db_ping
+  retries: 30
+  delay: 5
+  until: seafile_db_ping.rc == 0
+  changed_when: false
+  become: true
+
+- name: Check if seafile-memcached exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile-memcached"
+  register: seafile_memcached_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile-memcached
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name seafile-memcached
+    --pod seafile-pod
+    --restart=always
+    docker.io/library/memcached:1.6-alpine
+  when: seafile_memcached_exists.rc != 0
+  become: true
+
+- name: Check if seafile container exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile"
+  register: seafile_container_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile container
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name seafile
+    --pod seafile-pod
+    --restart=always
+    -e DB_HOST=127.0.0.1
+    -e DB_ROOT_PASSWD={{ seafile_db_root_password }}
+    -e TIME_ZONE={{ timezone }}
+    -e SEAFILE_ADMIN_EMAIL={{ seafile_admin_email }}
+    -e SEAFILE_ADMIN_PASSWORD={{ seafile_admin_password }}
+    -e SEAFILE_SERVER_LETSENCRYPT=false
+    -e SEAFILE_SERVER_HOSTNAME={{ seafile_server_hostname }}
+    -v /srv/seafile/data:/shared
+    docker.io/seafileltd/seafile-mc:13.0.20
+  when: seafile_container_exists.rc != 0
+  become: true

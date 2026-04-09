@@ -11,6 +11,14 @@
   failed_when: false
   become: true
 
+- name: Remove old generated pod unit if present
+  file:
+    path: "/etc/systemd/system/pod-{{ item }}.service"
+    state: absent
+  loop: "{{ pod_names | default([]) }}"
+  when: item in (existing_pods.stdout_lines | default([]))
+  become: true
+
 - name: Generate systemd units for existing pods
   command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --name {{ item }} --files"
   args:
@@ -27,11 +35,18 @@
   failed_when: false
   become: true
 
+- name: Remove old generated container unit if present
+  file:
+    path: "/etc/systemd/system/container-{{ item }}.service"
+    state: absent
+  loop: "{{ container_names | default([]) }}"
+  when: item in (existing_containers.stdout_lines | default([]))
+  become: true
+
 - name: Generate systemd units for standalone containers
   command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --name {{ item }} --files"
   args:
     chdir: /etc/systemd/system
-    creates: "/etc/systemd/system/container-{{ item }}.service"
   loop: "{{ container_names | default([]) }}"
   when: item in (existing_containers.stdout_lines | default([]))
   become: true
