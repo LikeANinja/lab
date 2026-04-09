@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MUSIC_DIR="{{ yt_music_dir }}"
+VPN_CONTAINER="{{ gluetun_name }}"
+
+usage() {
+  echo "Usage: yt-vpn <youtube_id_or_url> [extra yt-dlp args...]" >&2
+  exit 2
+}
+
+[[ $# -ge 1 ]] || usage
+
+INPUT="$1"
+shift || true
+
+if [[ "$INPUT" =~ ^[A-Za-z0-9_-]{11}$ ]]; then
+  URL="https://www.youtube.com/watch?v=${INPUT}"
+else
+  URL="$INPUT"
+fi
+
+if [[ ! -d "$MUSIC_DIR" ]]; then
+  echo "Music directory does not exist: $MUSIC_DIR" >&2
+  exit 1
+fi
+
+if ! sudo podman ps --format '{{.Names}}' | grep -qx "$VPN_CONTAINER"; then
+  echo "Starting VPN container..."
+  sudo systemctl start container-{{ gluetun_name }}.service 2>/dev/null || true
+fi
+
+cd "$MUSIC_DIR"
+
+sudo podman run --rm \
+  --network=container:${VPN_CONTAINER} \
+  -v "${MUSIC_DIR}:/work" \
+  -w /work \
+  ghcr.io/yt-dlp/yt-dlp:latest \
+  --no-playlist \
+  --format "bestaudio/best" \
+  --extract-audio \
+  --audio-format "mp3" \
+  --audio-quality "0" \
+  --embed-metadata \
+  --embed-thumbnail \
+  --write-info-json \
+  --output "%(title).200B [%(id)s].%(ext)s" \
+  "$@" \
+  "$URL"

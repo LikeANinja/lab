@@ -1,0 +1,22 @@
+vpn_media_base: /srv/vpn-media
+
+gluetun_name: gluetun
+qbittorrent_name: qbittorrent
+
+qb_config_dir: "{{ vpn_media_base }}/qbittorrent/config"
+qb_downloads_dir: "{{ vpn_media_base }}/qbittorrent/downloads"
+
+yt_music_dir: /srv/media/music
+
+vpn_tz: Europe/London
+
+qb_webui_host_port: 8085
+qb_webui_container_port: 8080
+qb_torrent_port: 6881
+
+qb_puid: 1000
+qb_pgid: 1000
+
+mullvad_wireguard_private_key: ""
+mullvad_wireguard_addresses: ""
+mullvad_wireguard_dns: "1.1.1.1"

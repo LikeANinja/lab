@@ -1,0 +1,91 @@
+---
+- name: Fail if Mullvad WireGuard secrets are not set
+  fail:
+    msg: "Set mullvad_wireguard_private_key and mullvad_wireguard_addresses in vault or group vars."
+  when: mullvad_wireguard_private_key | length == 0 or mullvad_wireguard_addresses | length == 0
+
+- name: Ensure VPN media directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ vpn_media_base }}"
+    - "{{ qb_config_dir }}"
+    - "{{ qb_downloads_dir }}"
+    - "{{ yt_music_dir }}"
+  become: true
+
+- name: Pull Gluetun image
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pull ghcr.io/qdm12/gluetun:latest"
+  changed_when: false
+  become: true
+
+- name: Pull qBittorrent image
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/linuxserver/qbittorrent:latest"
+  changed_when: false
+  become: true
+
+- name: Remove existing qBittorrent container if present
+  command: "{{ podman_bin | default('/usr/bin/podman') }} rm -f {{ qbittorrent_name }}"
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Remove existing Gluetun container if present
+  command: "{{ podman_bin | default('/usr/bin/podman') }} rm -f {{ gluetun_name }}"
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Run Gluetun with Mullvad WireGuard
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name {{ gluetun_name }}
+    --restart=always
+    --cap-add=NET_ADMIN
+    --device=/dev/net/tun
+    -p {{ qb_webui_host_port }}:{{ qb_webui_container_port }}/tcp
+    -p {{ qb_torrent_port }}:{{ qb_torrent_port }}/tcp
+    -p {{ qb_torrent_port }}:{{ qb_torrent_port }}/udp
+    -e VPN_SERVICE_PROVIDER=mullvad
+    -e VPN_TYPE=wireguard
+    -e WIREGUARD_PRIVATE_KEY={{ mullvad_wireguard_private_key }}
+    -e WIREGUARD_ADDRESSES={{ mullvad_wireguard_addresses }}
+    -e DNS_ADDRESS={{ mullvad_wireguard_dns }}
+    -e TZ={{ vpn_tz }}
+    -e FIREWALL=on
+    ghcr.io/qdm12/gluetun:latest
+  register: gluetun_run
+  failed_when: gluetun_run.rc != 0 and ("name is already in use" not in gluetun_run.stderr)
+  changed_when: gluetun_run.rc == 0
+  become: true
+
+- name: Run qBittorrent through Gluetun network namespace
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name {{ qbittorrent_name }}
+    --restart=always
+    --network=container:{{ gluetun_name }}
+    -e PUID={{ qb_puid }}
+    -e PGID={{ qb_pgid }}
+    -e TZ={{ vpn_tz }}
+    -e WEBUI_PORT={{ qb_webui_container_port }}
+    -v {{ qb_config_dir }}:/config
+    -v {{ qb_downloads_dir }}:/downloads
+    docker.io/linuxserver/qbittorrent:latest
+  register: qb_run
+  failed_when: qb_run.rc != 0 and ("name is already in use" not in qb_run.stderr)
+  changed_when: qb_run.rc == 0
+  become: true
+
+- name: Install yt-vpn helper script
+  template:
+    src: yt-vpn.sh.j2
+    dest: /usr/local/bin/yt-vpn
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
