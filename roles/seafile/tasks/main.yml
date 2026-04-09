@@ -51,6 +51,17 @@
   when: seafile_db_exists.rc != 0
   become: true
 
+- name: Wait for Seafile MariaDB to be ready
+  command: >
+    {{ podman_bin | default('/usr/bin/podman') }} exec seafile-db
+    mariadb-admin ping -h 127.0.0.1 -uroot -p{{ seafile_db_root_password }}
+  register: seafile_db_ping
+  retries: 30
+  delay: 5
+  until: seafile_db_ping.rc == 0
+  changed_when: false
+  become: true
+
 - name: Check if seafile-memcached exists
   command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile-memcached"
   register: seafile_memcached_exists
