@@ -14,9 +14,9 @@
 
 - name: Ensure media directory exists
   file:
-    path: /srv/media
+    path: /srv
     state: directory
-    owner: ninja
+    owner: kris
     group: smbusers
     mode: "0775"
 
