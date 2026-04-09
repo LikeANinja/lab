@@ -1,57 +1,45 @@
----
 - name: Ensure systemd unit directory exists
   file:
     path: /etc/systemd/system
     state: directory
     mode: "0755"
 
-# -------------------------
-# PODS
-# -------------------------
-
 - name: List existing pods
-  command: podman pod ls --format "{{'{{'}}.Name{{'}}'}}"
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pod ls --format {{ '{{.Name}}' }}"
   register: existing_pods
   changed_when: false
   failed_when: false
+  become: true
 
 - name: Generate systemd units for existing pods
-  command: podman generate systemd --new --name {{ item }} --files
+  command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --new --name {{ item }} --files"
   args:
     chdir: /etc/systemd/system
     creates: "/etc/systemd/system/pod-{{ item }}.service"
   loop: "{{ pod_names | default([]) }}"
   when: item in (existing_pods.stdout_lines | default([]))
-
-# -------------------------
-# STANDALONE CONTAINERS
-# -------------------------
+  become: true
 
 - name: List existing containers
-  command: podman ps -a --format "{{'{{'}}.Names{{'}}'}}"
+  command: "{{ podman_bin | default('/usr/bin/podman') }} ps -a --format {{ '{{.Names}}' }}"
   register: existing_containers
   changed_when: false
   failed_when: false
+  become: true
 
 - name: Generate systemd units for standalone containers
-  command: podman generate systemd --new --name {{ item }} --files
+  command: "{{ podman_bin | default('/usr/bin/podman') }} generate systemd --new --name {{ item }} --files"
   args:
     chdir: /etc/systemd/system
     creates: "/etc/systemd/system/container-{{ item }}.service"
   loop: "{{ container_names | default([]) }}"
   when: item in (existing_containers.stdout_lines | default([]))
-
-# -------------------------
-# SYSTEMD RELOAD
-# -------------------------
+  become: true
 
 - name: Reload systemd
   systemd:
     daemon_reload: true
-
-# -------------------------
-# ENABLE POD UNITS
-# -------------------------
+  become: true
 
 - name: Enable and start pod units
   systemd:
@@ -60,10 +48,7 @@
     state: started
   loop: "{{ pod_names | default([]) }}"
   when: item in (existing_pods.stdout_lines | default([]))
-
-# -------------------------
-# ENABLE CONTAINER UNITS
-# -------------------------
+  become: true
 
 - name: Enable and start standalone container units
   systemd:
@@ -72,3 +57,4 @@
     state: started
   loop: "{{ container_names | default([]) }}"
   when: item in (existing_containers.stdout_lines | default([]))
+  become: true

@@ -1,43 +1,28 @@
----
-- name: Ensure Calibre-Web-Automated directories exist
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  loop:
-    - /srv/calibre-web-automated
-    - /srv/calibre-web-automated/config
-    - /srv/calibre-web-automated/ingest
-    - /srv/calibre-web-automated/library
-  become: true
-
-- name: Pull Calibre-Web-Automated image
+- name: Pre-pull calibre image (optional)
+  when: prepull_images | default(false)
   command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/crocodilestick/calibre-web-automated:latest"
   changed_when: false
   become: true
 
-- name: Remove old Calibre-Web-Automated container if present
-  command: "{{ podman_bin | default('/usr/bin/podman') }} rm -f calibre-web-automated"
+- name: Check if calibre-web-automated container exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists calibre-web-automated"
+  register: calibre_exists
   failed_when: false
   changed_when: false
   become: true
 
-- name: Run Calibre-Web-Automated
+- name: Create calibre-web-automated container
   command: >
     {{ podman_bin | default('/usr/bin/podman') }} run -d
     --name calibre-web-automated
     --restart=always
-    -p 8083:8083
-    -e TZ={{ timezone | default('Europe/London') }}
+    -p {{ ports.calibre }}:8083
+    -e TZ={{ timezone }}
     -e PUID={{ calibre_puid | default('1000') }}
     -e PGID={{ calibre_pgid | default('1000') }}
     -v /srv/calibre-web-automated/config:/config
     -v /srv/calibre-web-automated/library:/calibre-library
     -v /srv/calibre-web-automated/ingest:/cwa-book-ingest
     docker.io/crocodilestick/calibre-web-automated:latest
-  register: cwa_run
-  failed_when: cwa_run.rc != 0 and ("name is already in use" not in cwa_run.stderr)
-  changed_when: cwa_run.rc == 0
+  when: calibre_exists.rc != 0
   become: true

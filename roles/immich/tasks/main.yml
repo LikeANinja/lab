@@ -1,18 +1,25 @@
-- name: Pre-pull images (optional)
-  when: prepull_images
+- name: Pre-pull immich images (optional)
+  when: prepull_images | default(false)
   block:
-    - command: podman pull docker.io/library/redis:7
-      register: p1
-      changed_when: "'Downloaded' in p1.stdout or 'downloaded' in p1.stdout"
-    - command: podman pull ghcr.io/immich-app/postgres:16-vectorchord0.5.3-pgvector0.8.1
-      register: p2
-      changed_when: "'Downloaded' in p2.stdout or 'downloaded' in p2.stdout"
-    - command: podman pull ghcr.io/immich-app/immich-machine-learning:release
-      register: p3
-      changed_when: "'Downloaded' in p3.stdout or 'downloaded' in p3.stdout"
-    - command: podman pull ghcr.io/immich-app/immich-server:release
-      register: p4
-      changed_when: "'Downloaded' in p4.stdout or 'downloaded' in p4.stdout"
+    - name: Pull redis
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/library/redis:7"
+      changed_when: false
+      become: true
+
+    - name: Pull immich postgres
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull ghcr.io/immich-app/postgres:16-vectorchord0.5.3-pgvector0.8.1"
+      changed_when: false
+      become: true
+
+    - name: Pull immich ml
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull ghcr.io/immich-app/immich-machine-learning:release"
+      changed_when: false
+      become: true
+
+    - name: Pull immich server
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull ghcr.io/immich-app/immich-server:release"
+      changed_when: false
+      become: true
 
 - name: Create immich secret file if missing
   shell: |
@@ -24,54 +31,111 @@
     fi
   args:
     executable: /bin/bash
+  become: true
 
-- name: Load immich secrets
+- name: Load immich secret
   shell: ". {{ secrets_dir }}/immich.env && echo $IMMICH_DB_PASSWORD"
   args:
     executable: /bin/bash
   register: im_pw
   changed_when: false
+  become: true
 
 - name: Ensure immich DB volume exists
-  command: podman volume create immich-db
-  register: vol
-  failed_when: vol.rc != 0 and ("already exists" not in vol.stderr)
+  command: "{{ podman_bin | default('/usr/bin/podman') }} volume exists immich-db"
+  register: immich_volume_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create immich DB volume
+  command: "{{ podman_bin | default('/usr/bin/podman') }} volume create immich-db"
+  when: immich_volume_exists.rc != 0
+  become: true
+
+- name: Check if immich pod exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pod exists immich-pod"
+  register: immich_pod_exists
+  failed_when: false
+  changed_when: false
+  become: true
 
 - name: Create immich pod
   command: >
-    podman pod create --name immich-pod
+    {{ podman_bin | default('/usr/bin/podman') }} pod create
+    --name immich-pod
     -p {{ ports.immich }}:2283/tcp
-  register: out
-  failed_when: out.rc != 0 and ("already exists" not in out.stderr)
+  when: immich_pod_exists.rc != 0
+  become: true
 
-- name: Create immich-redis container
+- name: Check if immich-redis exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists immich-redis"
+  register: immich_redis_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create immich-redis
   command: >
-    podman run -d --name immich-redis --pod immich-pod --restart=always
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name immich-redis
+    --pod immich-pod
+    --restart=always
     docker.io/library/redis:7
-  register: out2
-  failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
+  when: immich_redis_exists.rc != 0
+  become: true
 
-- name: Create immich-db container
+- name: Check if immich-db exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists immich-db"
+  register: immich_db_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create immich-db
   command: >
-    podman run -d --name immich-db --pod immich-pod --restart=always
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name immich-db
+    --pod immich-pod
+    --restart=always
     -e POSTGRES_USER=immich
     -e POSTGRES_PASSWORD={{ im_pw.stdout }}
     -e POSTGRES_DB=immich
     -v immich-db:/var/lib/postgresql/data
     ghcr.io/immich-app/postgres:16-vectorchord0.5.3-pgvector0.8.1
-  register: out3
-  failed_when: out3.rc != 0 and ("name is already in use" not in out3.stderr)
+  when: immich_db_exists.rc != 0
+  become: true
 
-- name: Create immich-ml container
+- name: Check if immich-ml exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists immich-ml"
+  register: immich_ml_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create immich-ml
   command: >
-    podman run -d --name immich-ml --pod immich-pod --restart=always
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name immich-ml
+    --pod immich-pod
+    --restart=always
     ghcr.io/immich-app/immich-machine-learning:release
-  register: out4
-  failed_when: out4.rc != 0 and ("name is already in use" not in out4.stderr)
+  when: immich_ml_exists.rc != 0
+  become: true
 
-- name: Create immich-server container
+- name: Check if immich-server exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists immich-server"
+  register: immich_server_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create immich-server
   command: >
-    podman run -d --name immich-server --pod immich-pod --restart=always
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name immich-server
+    --pod immich-pod
+    --restart=always
     -e TZ={{ timezone }}
     -e IMMICH_HOST=0.0.0.0
     -e IMMICH_PORT=2283
@@ -84,5 +148,5 @@
     -e IMMICH_MACHINE_LEARNING_URL=http://127.0.0.1:3003
     -v {{ srv_base }}/immich/upload:/usr/src/app/upload
     ghcr.io/immich-app/immich-server:release
-  register: out5
-  failed_when: out5.rc != 0 and ("name is already in use" not in out5.stderr)
+  when: immich_server_exists.rc != 0
+  become: true

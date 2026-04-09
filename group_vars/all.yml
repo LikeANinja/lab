@@ -10,8 +10,11 @@ ports:
   jellyfin: 8096
   navidrome: 4533
   audiobookshelf: 13378
-  nextcloud: 8080
   immich: 2283
+  seafile: 8082
+  mealie: 9000
+  calibre: 8083
+  qbittorrent: 8085
   # pihole_web: 8081
 
 pihole_dns1: "1.1.1.1"

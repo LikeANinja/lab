@@ -1,34 +1,23 @@
----
-- name: Ensure Mealie directories exist
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  loop:
-    - /srv/mealie
-    - /srv/mealie/data
-  become: true
-
-- name: Pull Mealie image
+- name: Pre-pull mealie image (optional)
+  when: prepull_images | default(false)
   command: "{{ podman_bin | default('/usr/bin/podman') }} pull ghcr.io/mealie-recipes/mealie:v3.12.0"
   changed_when: false
   become: true
 
-- name: Remove old Mealie container if present
-  command: "{{ podman_bin | default('/usr/bin/podman') }} rm -f mealie"
+- name: Check if mealie container exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists mealie"
+  register: mealie_exists
   failed_when: false
   changed_when: false
   become: true
 
-- name: Run Mealie
+- name: Create mealie container
   command: >
     {{ podman_bin | default('/usr/bin/podman') }} run -d
     --name mealie
     --restart=always
-    -p 9000:9000
-    -e TZ={{ timezone | default('Europe/London') }}
+    -p {{ ports.mealie }}:9000
+    -e TZ={{ timezone }}
     -e ALLOW_SIGNUP=false
     -e PUID={{ mealie_puid | default('1000') }}
     -e PGID={{ mealie_pgid | default('1000') }}
@@ -37,7 +26,5 @@
     -e WEB_CONCURRENCY=1
     -v /srv/mealie/data:/app/data
     ghcr.io/mealie-recipes/mealie:v3.12.0
-  register: mealie_run
-  failed_when: mealie_run.rc != 0 and ("name is already in use" not in mealie_run.stderr)
-  changed_when: mealie_run.rc == 0
+  when: mealie_exists.rc != 0
   become: true

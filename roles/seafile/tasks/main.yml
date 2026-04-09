@@ -1,47 +1,44 @@
----
-- name: Ensure Seafile directories exist
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  loop:
-    - /srv/seafile
-    - /srv/seafile/db
-    - /srv/seafile/data
-  become: true
+- name: Pre-pull seafile images (optional)
+  when: prepull_images | default(false)
+  block:
+    - name: Pull mariadb
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/library/mariadb:10.11"
+      changed_when: false
+      become: true
 
-- name: Pull Seafile dependencies
-  command: "{{ podman_bin | default('/usr/bin/podman') }} pull {{ item }}"
-  loop:
-    - docker.io/library/mariadb:10.11
-    - docker.io/library/memcached:1.6-alpine
-    - docker.io/seafileltd/seafile-mc:13.0.20
-  changed_when: false
-  become: true
+    - name: Pull memcached
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/library/memcached:1.6-alpine"
+      changed_when: false
+      become: true
 
-- name: Remove old Seafile containers if present
-  command: "{{ podman_bin | default('/usr/bin/podman') }} rm -f {{ item }}"
-  loop:
-    - seafile-db
-    - seafile-memcached
-    - seafile
+    - name: Pull seafile
+      command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/seafileltd/seafile-mc:13.0.20"
+      changed_when: false
+      become: true
+
+- name: Check if seafile pod exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pod exists seafile-pod"
+  register: seafile_pod_exists
   failed_when: false
   changed_when: false
   become: true
 
-- name: Create Seafile pod
+- name: Create seafile pod
   command: >
     {{ podman_bin | default('/usr/bin/podman') }} pod create
     --name seafile-pod
-    -p 8082:80
-  register: seafile_pod
-  failed_when: seafile_pod.rc != 0 and ("name is already in use" not in seafile_pod.stderr)
-  changed_when: seafile_pod.rc == 0
+    -p {{ ports.seafile }}:80
+  when: seafile_pod_exists.rc != 0
   become: true
 
-- name: Run Seafile MariaDB
+- name: Check if seafile-db exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile-db"
+  register: seafile_db_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile-db
   command: >
     {{ podman_bin | default('/usr/bin/podman') }} run -d
     --name seafile-db
@@ -51,24 +48,34 @@
     -e MYSQL_LOG_CONSOLE=true
     -v /srv/seafile/db:/var/lib/mysql
     docker.io/library/mariadb:10.11
-  register: seafile_db
-  failed_when: seafile_db.rc != 0 and ("name is already in use" not in seafile_db.stderr)
-  changed_when: seafile_db.rc == 0
+  when: seafile_db_exists.rc != 0
   become: true
 
-- name: Run Seafile Memcached
+- name: Check if seafile-memcached exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile-memcached"
+  register: seafile_memcached_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile-memcached
   command: >
     {{ podman_bin | default('/usr/bin/podman') }} run -d
     --name seafile-memcached
     --pod seafile-pod
     --restart=always
     docker.io/library/memcached:1.6-alpine
-  register: seafile_memcached
-  failed_when: seafile_memcached.rc != 0 and ("name is already in use" not in seafile_memcached.stderr)
-  changed_when: seafile_memcached.rc == 0
+  when: seafile_memcached_exists.rc != 0
   become: true
 
-- name: Run Seafile
+- name: Check if seafile container exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists seafile"
+  register: seafile_container_exists
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Create seafile container
   command: >
     {{ podman_bin | default('/usr/bin/podman') }} run -d
     --name seafile
@@ -76,14 +83,12 @@
     --restart=always
     -e DB_HOST=127.0.0.1
     -e DB_ROOT_PASSWD={{ seafile_db_root_password }}
-    -e TIME_ZONE={{ timezone | default('Europe/London') }}
+    -e TIME_ZONE={{ timezone }}
     -e SEAFILE_ADMIN_EMAIL={{ seafile_admin_email }}
     -e SEAFILE_ADMIN_PASSWORD={{ seafile_admin_password }}
     -e SEAFILE_SERVER_LETSENCRYPT=false
     -e SEAFILE_SERVER_HOSTNAME={{ seafile_server_hostname }}
     -v /srv/seafile/data:/shared
     docker.io/seafileltd/seafile-mc:13.0.20
-  register: seafile_app
-  failed_when: seafile_app.rc != 0 and ("name is already in use" not in seafile_app.stderr)
-  changed_when: seafile_app.rc == 0
+  when: seafile_container_exists.rc != 0
   become: true

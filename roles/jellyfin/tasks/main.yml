@@ -1,23 +1,42 @@
 - name: Pre-pull jellyfin image (optional)
-  when: prepull_images
-  command: podman pull docker.io/jellyfin/jellyfin:latest
-  register: pull
-  changed_when: "'Downloaded' in pull.stdout or 'downloaded' in pull.stdout"
+  when: prepull_images | default(false)
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pull docker.io/jellyfin/jellyfin:latest"
+  register: jellyfin_pull
+  changed_when: "'Downloaded' in (jellyfin_pull.stdout | default('')) or 'downloaded' in (jellyfin_pull.stdout | default(''))"
+  become: true
+
+- name: Check if jellyfin pod exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pod exists jellyfin-pod"
+  register: jellyfin_pod_exists
+  failed_when: false
+  changed_when: false
+  become: true
 
 - name: Create jellyfin pod
   command: >
-    podman pod create --name jellyfin-pod
+    {{ podman_bin | default('/usr/bin/podman') }} pod create
+    --name jellyfin-pod
     -p {{ ports.jellyfin }}:8096/tcp
-  register: out
-  failed_when: out.rc != 0 and ("already exists" not in out.stderr)
+  when: jellyfin_pod_exists.rc != 0
+  become: true
+
+- name: Check if jellyfin container exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists jellyfin"
+  register: jellyfin_container_exists
+  failed_when: false
+  changed_when: false
+  become: true
 
 - name: Create jellyfin container
   command: >
-    podman run -d --name jellyfin --pod jellyfin-pod --restart=always
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name jellyfin
+    --pod jellyfin-pod
+    --restart=always
     -e TZ={{ timezone }}
     -v {{ srv_base }}/jellyfin/config:/config
     -v {{ srv_base }}/jellyfin/cache:/cache
     -v {{ media_dir }}:/media:ro
     docker.io/jellyfin/jellyfin:latest
-  register: out2
-  failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
+  when: jellyfin_container_exists.rc != 0
+  become: true

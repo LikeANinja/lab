@@ -1,24 +1,43 @@
 - name: Pre-pull audiobookshelf image (optional)
-  when: prepull_images
-  command: podman pull ghcr.io/advplyr/audiobookshelf:latest
-  register: pull
-  changed_when: "'Downloaded' in pull.stdout or 'downloaded' in pull.stdout"
+  when: prepull_images | default(false)
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pull ghcr.io/advplyr/audiobookshelf:latest"
+  register: audiobookshelf_pull
+  changed_when: "'Downloaded' in (audiobookshelf_pull.stdout | default('')) or 'downloaded' in (audiobookshelf_pull.stdout | default(''))"
+  become: true
+
+- name: Check if audiobookshelf pod exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} pod exists audiobookshelf-pod"
+  register: audiobookshelf_pod_exists
+  failed_when: false
+  changed_when: false
+  become: true
 
 - name: Create audiobookshelf pod
   command: >
-    podman pod create --name audiobookshelf-pod
+    {{ podman_bin | default('/usr/bin/podman') }} pod create
+    --name audiobookshelf-pod
     -p {{ ports.audiobookshelf }}:80/tcp
-  register: out
-  failed_when: out.rc != 0 and ("already exists" not in out.stderr)
+  when: audiobookshelf_pod_exists.rc != 0
+  become: true
+
+- name: Check if audiobookshelf container exists
+  command: "{{ podman_bin | default('/usr/bin/podman') }} container exists audiobookshelf"
+  register: audiobookshelf_container_exists
+  failed_when: false
+  changed_when: false
+  become: true
 
 - name: Create audiobookshelf container
   command: >
-    podman run -d --name audiobookshelf --pod audiobookshelf-pod --restart=always
+    {{ podman_bin | default('/usr/bin/podman') }} run -d
+    --name audiobookshelf
+    --pod audiobookshelf-pod
+    --restart=always
     -e TZ={{ timezone }}
     -v {{ srv_base }}/audiobookshelf/config:/config
     -v {{ srv_base }}/audiobookshelf/metadata:/metadata
     -v {{ media_dir }}/audiobooks:/audiobooks:ro
     -v {{ media_dir }}/podcasts:/podcasts
     ghcr.io/advplyr/audiobookshelf:latest
-  register: out2
-  failed_when: out2.rc != 0 and ("name is already in use" not in out2.stderr)
+  when: audiobookshelf_container_exists.rc != 0
+  become: true
