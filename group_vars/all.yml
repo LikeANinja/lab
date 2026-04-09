@@ -29,7 +29,7 @@ pod_names:
   - jellyfin-pod
   - navidrome-pod
   - audiobookshelf-pod
-  # - nextcloud-pod
+  - nextcloud-pod
   - seafile-pod
   - immich-pod
   # - pihole-pod
