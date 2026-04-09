@@ -12,7 +12,7 @@ ports:
   audiobookshelf: 13378
   nextcloud: 8080
   immich: 2283
-  pihole_web: 8081
+  # pihole_web: 8081
 
 pihole_dns1: "1.1.1.1"
 pihole_dns2: "1.0.0.1"
@@ -26,14 +26,33 @@ pod_names:
   - jellyfin-pod
   - navidrome-pod
   - audiobookshelf-pod
-  - nextcloud-pod
+  # - nextcloud-pod
+  - seafile-pod
   - immich-pod
-  - pihole-pod
+  # - pihole-pod
 
-tailscale_hostname: "ninja-dev"
+container_names:
+  - mealie
+  - calibre-web-automated
+  - gluetun
+  - qbittorrent
+
+tailscale_hostname: "media"
 tailscale_tags: []
 
 caddy_http_port: 80
 caddy_https_port: 443
 
 caddy_sites: []
+
+seafile_db_root_password: "ynd*jea2azk-GDF_xcv"
+seafile_admin_email: "kris@krisager.co.uk"
+seafile_admin_password: "gka0fxd_bhg@NUD7cac"
+seafile_server_hostname: "files.at.horrorho.me"
+
+mealie_base_url: "http://192.168.1.40:9000"
+mealie_puid: 1000
+mealie_pgid: 1000
+
+calibre_puid: 1000
+calibre_pgid: 1000

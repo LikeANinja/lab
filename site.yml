@@ -8,14 +8,18 @@
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   roles:
     - { role: base, tags: ["base"] }
-    - { role: firewall, tags: ["firewall"] }
-    - { role: samba, tags: ["samba"] }
     - { role: tailscale, tags: ["tailscale"] }
+    - { role: samba, tags: ["samba"] }
+    # - { role: firewall, tags: ["firewall"] }
     - { role: jellyfin, tags: ["jellyfin"] }
     - { role: navidrome, tags: ["navidrome"] }
     - { role: audiobookshelf, tags: ["audiobookshelf"] }
-    - { role: nextcloud, tags: ["nextcloud"] }
+    - { role: seafile, tags: ["seafile"] }
+    - { role: mealie, tags: ["mealie"] }
+    - { role: calibre_web_automated, tags: ["calibre"] }
     - { role: immich, tags: ["immich"] }
-    - { role: pihole, tags: ["pihole"] }
+    - { role: vpn_media, tags: ["vpn_media"] }
+    # - { role: nextcloud, tags: ["nextcloud"] }
+    # - { role: pihole, tags: ["pihole"] }
     # - { role: caddy, tags: ["caddy"] }
     - { role: podman_systemd, tags: ["podman_systemd"] }
